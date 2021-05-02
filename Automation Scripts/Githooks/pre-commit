@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# An example hook script to verify what is about to be committed.
+# Called by "git commit" with no arguments.  The hook should
+# exit with non-zero status after issuing an appropriate message if
+# it wants to stop the commit.
+#
+# To enable this hook, rename this file to "pre-commit".
+#!/bin/sh
+# Avoid doing commit in environment branches.
+
+# We should not commit our code directly to the environment branches. 
+# The below code will restrict the commit in environment branches.
+
+BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+forbidden_branchs="^(master|dev|release)$"
+
+
+message="You should not commit directly into ${BRANCH_NAME} branch.\nPlease create a new branch from '$BRANCH_NAME' and Try again."
+
+
+if [[ $BRANCH_NAME =~ $forbidden_branchs ]]
+then
+    echo -e $message
+    exit 1
+fi
+
+
+# write a script which will make stash before committing code every time
+# then we will get state if each and every commit in our stash.
+
+if [[ $(git diff --cached --exit-code) ]];then
+  BRANCH_NAME=$(git branch --show-current)
+  STASH_NAME="pre-commit-on-$BRANCH_NAME-$(date +"%m-%d-%y::%T")"
+  git stash save -q --keep-index $STASH_NAME
+  echo "Stash:${STASH_NAME} saved!"       
+fi
+
+# Before pushing our branches to remote lets create a hook which will execute build and tests
+# before pushing your code to remote branch.
+
+echo "Running Build"
+sh run-test-scripts.sh
+
+if [ $? -ne 0 ]; then
+  echo "Build must be succeed before commit!"
+  exit 1
+fi
